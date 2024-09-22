@@ -50,9 +50,10 @@ var (
 )
 
 //go:embed prompts/*.tpl
-var promptTemplates embed.FS
+var promptTemplates embed.FS // Embed prompt templates from the prompts directory
 
 func init() {
+	// Define command-line flags
 	flag.StringVar(&conversationfile, "conversationfile", "", "path to transcript")
 	flag.StringVar(&pdfurl, "pdf-url", "", "URL for PDF")
 	flag.StringVar(&modelName, "model", "gemini-1.5-flash", "generative model name")
@@ -75,7 +76,8 @@ func main() {
 	}
 	// Get Google Cloud Region from environment variable
 	location = envCheck("REGION", "us-central1") // default is us-central1
-	// flag guard
+
+	// Validate input sources
 	if conversationfile == "" {
 		if pdfurl == "" {
 			log.Fatalln("Must have one of either a transcript or a pdf-url source")
@@ -84,6 +86,7 @@ func main() {
 
 	var conversation string
 
+	// Process PDF URL if provided
 	if pdfurl != "" {
 		var err error
 		conversation, err = createConversationFromPDFURL(pdfurl)
@@ -91,14 +94,7 @@ func main() {
 			log.Printf("unable to create conversation from url %s: %v", pdfurl, err)
 			os.Exit(1)
 		}
-	} else {
-		// conversation
-		// assume text (different speakers, turn-by-turn, one line each)
-		// if not, use JSON conversation format
-		//if len(flag.Args()) < 1 {
-		//	log.Printf("please provide path to conversation file")
-		//	os.Exit(1)
-		//}
+	} else { // Process conversation file if provided
 		conversationfile := flag.Arg(0)
 		convbytes, err := os.ReadFile(conversationfile)
 		if err != nil {
@@ -114,10 +110,13 @@ func main() {
 		time.Now().Format("20060102.030405.06"),
 	)
 
+	// Generate audio files from the conversation
 	audiofiles, err := fabulae.Fabulae(voice1name, voice2name, conversation, outputfilename, turnbyturn, striptags)
 	if err != nil {
 		log.Fatalf("error in Fabulae: %v", err)
 	}
+
+	// Combine generated audio files into a single output
 	output := combineWavFiles(audiofiles)
 	log.Printf("combined: %s", output)
 
@@ -165,11 +164,9 @@ func combineWavFiles(audiolist []string) string {
 	return outputfilename
 }
 
+// createConversationFromPDFURL generates a conversation from a PDF URL using a generative AI model
 func createConversationFromPDFURL(pdfurl string) (string, error) {
-	//pdfcontent, err := retrievePDFContent(pdfurl)
-	//if err != nil {
-	//	return "", err
-	//}
+	log.Printf("generating conversation from %s ...", pdfurl)
 
 	conversation, err := generateConversationFrom(projectID, location, modelName, pdfurl)
 	if err != nil {
