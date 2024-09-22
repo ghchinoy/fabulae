@@ -32,6 +32,8 @@ import (
 
 	"cloud.google.com/go/vertexai/genai"
 	"github.com/ghchinoy/fabulae"
+	"github.com/k0kubun/go-ansi"
+	"github.com/schollz/progressbar/v3"
 
 	"github.com/moutend/go-wav"
 )
@@ -46,6 +48,7 @@ var (
 	projectID              string
 	location               string
 	modelName              string
+	saveTranscript         bool
 	assetdir               string
 )
 
@@ -57,6 +60,7 @@ func init() {
 	flag.StringVar(&conversationfile, "conversationfile", "", "path to transcript")
 	flag.StringVar(&pdfurl, "pdf-url", "", "URL for PDF")
 	flag.StringVar(&modelName, "model", "gemini-1.5-flash", "generative model name")
+	flag.BoolVar(&saveTranscript, "save-transcript", false, "save generated transcript")
 	flag.StringVar(&assetdir, "assetdir", ".", "output folder")
 
 	flag.StringVar(&configfile, "config", "", "path to JSON config file")
@@ -94,8 +98,13 @@ func main() {
 			log.Printf("unable to create conversation from url %s: %v", pdfurl, err)
 			os.Exit(1)
 		}
+		if saveTranscript {
+			outputfilename := fmt.Sprintf("%s_transcript.txt", time.Now().Format("20060102.030405.06"))
+			os.WriteFile(outputfilename, []byte(conversation), 0644)
+			log.Printf("transcript saved to: %s", outputfilename)
+		}
 	} else { // Process conversation file if provided
-		conversationfile := flag.Arg(0)
+		//conversationfile := flag.Arg(0)
 		convbytes, err := os.ReadFile(conversationfile)
 		if err != nil {
 			log.Printf("couldn't find %s: %s", conversationfile, err.Error())
@@ -118,8 +127,9 @@ func main() {
 
 	// Combine generated audio files into a single output
 	output := combineWavFiles(audiofiles)
-	log.Printf("combined: %s", output)
 
+	fmt.Println()
+	fmt.Printf("audio file created: %s\n", output)
 }
 
 // combineWavFiles appends wav files to a single one
@@ -143,8 +153,17 @@ func combineWavFiles(audiolist []string) string {
 	log.Printf("%d wav files", len(wavs))
 
 	// combine all wavs into one
+	bar := progressbar.NewOptions(len(wavs),
+		progressbar.OptionSetWriter(ansi.NewAnsiStdout()), //you should install "github.com/k0kubun/go-ansi"
+		progressbar.OptionEnableColorCodes(true),
+		progressbar.OptionShowBytes(true),
+		progressbar.OptionSetWidth(15),
+		progressbar.OptionSetDescription(
+			fmt.Sprintf("[cyan][1/%d][reset] Combining audio file...", len(wavs)),
+		))
 	outputwav, _ := wav.New(wavs[0].SamplesPerSec(), wavs[0].BitsPerSample(), wavs[0].Channels())
 	for _, wav := range wavs {
+		bar.Add(1)
 		io.Copy(outputwav, wav)
 	}
 
@@ -157,7 +176,7 @@ func combineWavFiles(audiolist []string) string {
 	for _, i := range audiolist {
 		err := os.Remove(i)
 		if err != nil {
-			log.Printf("os.Remove: %w", err)
+			log.Printf("os.Remove: %v", err)
 		}
 	}
 
@@ -172,6 +191,8 @@ func createConversationFromPDFURL(pdfurl string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
+	log.Print("conversation created")
 
 	return conversation, nil
 }

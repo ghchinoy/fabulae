@@ -138,6 +138,8 @@ func Fabulae(voice1name, voice2name string, conversation string, outputfilename 
 				voice = voices[voice2name]
 			}
 			turn = stripParticipantTags(turn, tags)
+			log.Printf("voice: %s", voice.Name)
+			//log.Printf("turn: %s")
 			audiobytes, err := synthesizeWithVoice(ctx, voice, turn)
 			if err != nil {
 				log.Printf("error in synthesis for %d: %v", i, err)
@@ -152,8 +154,8 @@ func Fabulae(voice1name, voice2name string, conversation string, outputfilename 
 				log.Printf("unable to write to %s: %v", turnfilename, err)
 				return outputfiles, err
 			}
-			log.Printf("Written %d bytes", len(audiobytes))
-			fmt.Fprintf(os.Stdout, "Audio content written to file: %v\n", turnfilename)
+			log.Printf("Audio content written to file (%d bytes): %v", len(audiobytes), turnfilename)
+			//fmt.Fprintf(os.Stderr, "Audio content (%d bytes) written to file: %v\n", len(audiobytes), turnfilename)
 			outputfiles = append(outputfiles, turnfilename)
 		}
 	} else {
@@ -197,7 +199,7 @@ func Fabulae(voice1name, voice2name string, conversation string, outputfilename 
 
 // synthesizeWithVoice takes a string and a voice and returns audio bytes using GCP TTS
 func synthesizeWithVoice(ctx context.Context, voice ttspb.VoiceSelectionParams, turn string) ([]byte, error) {
-	log.Printf("voice: %s", voice.Name)
+	//log.Printf("voice: %s", voice.Name)
 	opts := []option.ClientOption{}
 	if strings.Contains(voice.Name, "Neural") {
 		opts = append(opts, option.WithEndpoint("texttospeech.googleapis.com:443"))
