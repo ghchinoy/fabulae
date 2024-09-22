@@ -31,11 +31,11 @@ go install github.com/ghchinoy/fabulae/fabulae-cli@latest
 fabulae-cli --pdf-url https://arxiv.org/pdf/2209.03143
 ```
 
-Listen with your favorite audio player. On OS X, you can use `afplay`, e.g.
+Listen with your favorite audio player. 
 
-```
-afplay 20240921.045413.24.wav
-```
+On OS X, you can use `afplay`, e.g. `afplay 20240921.045413.24.wav`
+
+On Linux, you can use `play` if you have sox installed, `play 20240921.045413.24.wav`
 
 
 ![](./assets/fabulae-usage.gif)
