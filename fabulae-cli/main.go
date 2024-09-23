@@ -49,11 +49,15 @@ var (
 	location               string
 	modelName              string
 	saveTranscript         bool
+	showVersion            bool
 	assetdir               string
 )
 
 //go:embed prompts/*.tpl
 var promptTemplates embed.FS // Embed prompt templates from the prompts directory
+
+//go:embed version
+var version string
 
 func init() {
 	// Define command-line flags
@@ -61,6 +65,7 @@ func init() {
 	flag.StringVar(&pdfurl, "pdf-url", "", "URL for PDF")
 	flag.StringVar(&modelName, "model", "gemini-1.5-flash", "generative model name")
 	flag.BoolVar(&saveTranscript, "save-transcript", false, "save generated transcript")
+	flag.BoolVar(&showVersion, "version", false, "show version")
 	flag.StringVar(&assetdir, "assetdir", ".", "output folder")
 
 	flag.StringVar(&configfile, "config", "", "path to JSON config file")
@@ -72,6 +77,12 @@ func init() {
 }
 
 func main() {
+
+	if showVersion {
+		fmt.Printf("fabulae %s\n", version)
+		flag.Usage()
+		os.Exit(0)
+	}
 
 	// Get Google Cloud Project ID from environment variable
 	projectID = envCheck("PROJECT_ID", "") // no default
