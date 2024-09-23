@@ -20,7 +20,9 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	texttospeech "cloud.google.com/go/texttospeech/apiv1"
@@ -100,6 +102,13 @@ func Speak(voice1name string, text string, gcsbucket string) (string, error) {
 	return outputfilename, nil
 }
 
+type turnconfig struct {
+	ID             int
+	Turn           string
+	Voice          ttspb.VoiceSelectionParams
+	OutputFilename string
+}
+
 func Fabulae(voice1name, voice2name string, conversation string, outputfilename string, turnbyturn bool, tags string) ([]string, error) {
 	striptags = tags
 
@@ -130,6 +139,11 @@ func Fabulae(voice1name, voice2name string, conversation string, outputfilename 
 			}
 			cleanturns = append(cleanturns, turn)
 		}
+
+		// goroutines
+
+		// Configure turns
+		configuredTurns := []turnconfig{}
 		for i, turn := range cleanturns {
 			var voice ttspb.VoiceSelectionParams
 			if i%2 == 0 {
@@ -138,26 +152,51 @@ func Fabulae(voice1name, voice2name string, conversation string, outputfilename 
 				voice = voices[voice2name]
 			}
 			turn = stripParticipantTags(turn, tags)
-			log.Printf("voice: %s", voice.Name)
-			//log.Printf("turn: %s")
-			audiobytes, err := synthesizeWithVoice(ctx, voice, turn)
-			if err != nil {
-				log.Printf("error in synthesis for %d: %v", i, err)
-				return outputfiles, err
-			}
-			dir, filename := filepath.Split(outputfilename)
-			filename = fmt.Sprintf("%02d_%s", i, filename)
-
-			turnfilename := filepath.Join(dir, filename)
-			err = os.WriteFile(turnfilename, audiobytes, 0644)
-			if err != nil {
-				log.Printf("unable to write to %s: %v", turnfilename, err)
-				return outputfiles, err
-			}
-			log.Printf("Audio content written to file (%d bytes): %v", len(audiobytes), turnfilename)
-			//fmt.Fprintf(os.Stderr, "Audio content (%d bytes) written to file: %v\n", len(audiobytes), turnfilename)
-			outputfiles = append(outputfiles, turnfilename)
+			configuredTurns = append(configuredTurns, turnconfig{
+				ID:             i,
+				Voice:          voice,
+				Turn:           turn,
+				OutputFilename: outputfilename,
+			})
 		}
+		//log.Printf("turns configured: %d", len(configuredTurns))
+
+		outputfiles = processAudioTurns(configuredTurns)
+		sort.Sort(sort.StringSlice(outputfiles))
+		//log.Printf("files: %s", outputfiles)
+
+		/*
+			// serially
+			for i, turn := range cleanturns {
+				var voice ttspb.VoiceSelectionParams
+				if i%2 == 0 {
+					voice = voices[voice1name]
+				} else {
+					voice = voices[voice2name]
+				}
+				turn = stripParticipantTags(turn, tags)
+				log.Printf("voice: %s", voice.Name)
+				//log.Printf("turn: %s")
+				audiobytes, err := synthesizeWithVoice(ctx, voice, turn)
+				if err != nil {
+					log.Printf("error in synthesis for %d: %v", i, err)
+					return outputfiles, err
+				}
+				dir, filename := filepath.Split(outputfilename)
+				filename = fmt.Sprintf("%02d_%s", i, filename)
+
+				turnfilename := filepath.Join(dir, filename)
+				err = os.WriteFile(turnfilename, audiobytes, 0644)
+				if err != nil {
+					log.Printf("unable to write to %s: %v", turnfilename, err)
+					return outputfiles, err
+				}
+				log.Printf("Audio content written to file (%d bytes): %v", len(audiobytes), turnfilename)
+				//fmt.Fprintf(os.Stderr, "Audio content (%d bytes) written to file: %v\n", len(audiobytes), turnfilename)
+				outputfiles = append(outputfiles, turnfilename)
+			}
+		*/
+
 	} else {
 		ssml := generateSSMLfromConversation(turns, []ttspb.VoiceSelectionParams{voices[voice1name], voices[voice2name]})
 		//log.Print(ssml)
@@ -195,6 +234,53 @@ func Fabulae(voice1name, voice2name string, conversation string, outputfilename 
 
 	return outputfiles, nil
 
+}
+
+// processAudioTurns concurrenctly creates audio and writes to temp dir
+func processAudioTurns(turns []turnconfig) []string {
+	ctx := context.Background()
+
+	var wg sync.WaitGroup
+	results := []string{}
+	resultChan := make(chan string, len(turns))
+
+	for i, turn := range turns {
+		wg.Add(1)
+		go func(i int, turn turnconfig) {
+			defer wg.Done()
+			//log.Printf("goroutine: %d; turn %d; voice: %s", i, turn.ID, turn.Voice.Name)
+			audiobytes, err := synthesizeWithVoice(ctx, turn.Voice, turn.Turn)
+			if err != nil {
+				resultChan <- fmt.Sprintf("error goroutine: %d; turn %d; voice: %s", i, turn.ID, turn.Voice.Name)
+			}
+
+			dir, filename := filepath.Split(turn.OutputFilename)
+			filename = fmt.Sprintf("%02d_%s", turn.ID, filename)
+
+			turnfilename := filepath.Join(dir, filename)
+			err = os.WriteFile(turnfilename, audiobytes, 0644)
+
+			if err != nil {
+				resultChan <- fmt.Sprintf("unable to write to %s: %v", turnfilename, err)
+			}
+			log.Printf("%2d %s Audio content (%7d bytes) written to file: %v",
+				turn.ID, turn.Voice.Name,
+				len(audiobytes), turnfilename,
+			)
+			resultChan <- turnfilename
+		}(i, turn)
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	for r := range resultChan {
+		results = append(results, r)
+	}
+
+	return results
 }
 
 // synthesizeWithVoice takes a string and a voice and returns audio bytes using GCP TTS
