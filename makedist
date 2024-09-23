@@ -5,7 +5,7 @@
 # No need to change anything below ####
 #
 
-VERSION=$(<internal/cmd/version)
+VERSION=$(<fabulae-cli/version)
 
 TOOLNAME=fabulae
 OSLIST=(linux darwin windows)
