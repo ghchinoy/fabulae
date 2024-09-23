@@ -9,7 +9,7 @@ require (
 	github.com/go-audio/wav v1.1.0
 	github.com/k0kubun/go-ansi v0.0.0-20180517002512-3bf9e2903213
 	github.com/moutend/go-wav v0.0.0-20170820031854-56127fbbb7ba
-	github.com/schollz/progressbar/v3 v3.15.0
+	github.com/schollz/progressbar/v3 v3.16.0
 	google.golang.org/api v0.198.0
 	google.golang.org/protobuf v1.34.2
 )
@@ -19,7 +19,7 @@ require (
 	cloud.google.com/go/aiplatform v1.68.0 // indirect
 	cloud.google.com/go/auth v0.9.4 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.4 // indirect
-	cloud.google.com/go/compute/metadata v0.5.1 // indirect
+	cloud.google.com/go/compute/metadata v0.5.2 // indirect
 	cloud.google.com/go/iam v1.2.1 // indirect
 	cloud.google.com/go/longrunning v0.6.1 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
@@ -28,6 +28,7 @@ require (
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
+	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/s2a-go v0.1.8 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.4 // indirect
