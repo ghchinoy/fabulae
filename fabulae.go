@@ -159,31 +159,11 @@ func Fabulae(voice1name, voice2name string, conversation string, outputfilename 
 				OutputFilename: outputfilename,
 			})
 		}
-		log.Printf("turns configured: %d", len(configuredTurns))
+		//log.Printf("turns configured: %d", len(configuredTurns))
 
 		outputfiles = processAudioTurns(configuredTurns)
 		sort.Sort(sort.StringSlice(outputfiles))
-		log.Printf("files: %s", outputfiles)
-
-		/*
-			// go routines for audio generation
-			var wg sync.WaitGroup
-			outputfileChannel := processAudio(configuredTurns...)
-			wg.Add(1)
-
-			go func() {
-				for val := range outputfileChannel {
-					log.Printf("channel1 data: %v", val)
-					if val != "" {
-						outputfiles = append(outputfiles, val)
-					}
-				}
-				wg.Done()
-			}()
-
-			wg.Wait()
-			log.Printf("done! %v", outputfiles)
-		*/
+		//log.Printf("files: %s", outputfiles)
 
 		/*
 			// serially
@@ -256,6 +236,7 @@ func Fabulae(voice1name, voice2name string, conversation string, outputfilename 
 
 }
 
+// processAudioTurns concurrenctly creates audio and writes to temp dir
 func processAudioTurns(turns []turnconfig) []string {
 	ctx := context.Background()
 
@@ -282,7 +263,10 @@ func processAudioTurns(turns []turnconfig) []string {
 			if err != nil {
 				resultChan <- fmt.Sprintf("unable to write to %s: %v", turnfilename, err)
 			}
-			log.Printf("Audio content written to file (%d bytes): %v", len(audiobytes), turnfilename)
+			log.Printf("%2d %s Audio content (%7d bytes) written to file: %v",
+				turn.ID, turn.Voice.Name,
+				len(audiobytes), turnfilename,
+			)
 			resultChan <- turnfilename
 		}(i, turn)
 	}
