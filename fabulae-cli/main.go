@@ -80,7 +80,7 @@ func main() {
 
 	if showVersion {
 		fmt.Printf("fabulae %s\n", version)
-		flag.Usage()
+		//flag.Usage()
 		os.Exit(0)
 	}
 
