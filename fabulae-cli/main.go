@@ -26,6 +26,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"text/template"
 	"time"
@@ -197,14 +198,11 @@ func combineWavFiles(audiolist []string) string {
 // createConversationFromPDFURL generates a conversation from a PDF URL using a generative AI model
 func createConversationFromPDFURL(pdfurl string) (string, error) {
 	log.Printf("generating conversation from %s ...", pdfurl)
-
 	conversation, err := generateConversationFrom(projectID, location, modelName, pdfurl)
 	if err != nil {
 		return "", err
 	}
-
 	log.Print("conversation created")
-
 	return conversation, nil
 }
 
@@ -258,20 +256,43 @@ func generateConversationFrom(projectID, location, modelName, pdfurl string) (st
 	buf := new(bytes.Buffer)
 	err = tmpl.Execute(buf, nil)
 
-	// Generate content
-	res, err := model.GenerateContent(
-		ctx,
+	// parts for both token count and generation
+	parts := []genai.Part{
 		part,
 		genai.Text(`"\n\n"`),
 		genai.Text(buf.String()),
-		/* 		genai.Text(`
-		   		You are a very professional document summarization specialist.
-		   		Please summarize the given document.
-		   `), */
+	}
+
+	// count tokens
+	if tr, err := model.CountTokens(ctx, parts...); err == nil {
+		log.Printf("processing %s tokens ...", strconv.FormatInt(int64(tr.TotalTokens), 10))
+	}
+
+	// generate content
+	model.SafetySettings = []*genai.SafetySetting{
+		{
+			Category:  genai.HarmCategoryHarassment,
+			Threshold: genai.HarmBlockOnlyHigh,
+		},
+		{
+			Category:  genai.HarmCategoryDangerousContent,
+			Threshold: genai.HarmBlockOnlyHigh,
+		},
+	}
+	bar := progressbar.NewOptions(
+		-1,
+		progressbar.OptionSetDescription("generating conversation ..."),
+		progressbar.OptionSetWidth(15),
 	)
+	bar.Add(1)
+
+	res, err := model.GenerateContent(ctx, parts...)
 	if err != nil {
 		return "", fmt.Errorf("unable to generate contents: %w", err)
 	}
+
+	bar.Finish()
+	fmt.Println()
 
 	if len(res.Candidates) == 0 ||
 		len(res.Candidates[0].Content.Parts) == 0 {
