@@ -52,6 +52,7 @@ var (
 	saveTranscript         bool
 	showVersion            bool
 	assetdir               string
+	promptfile             string
 )
 
 //go:embed prompts/*.tpl
@@ -67,6 +68,7 @@ func init() {
 	flag.StringVar(&modelName, "model", "gemini-1.5-flash", "generative model name")
 	flag.BoolVar(&saveTranscript, "save-transcript", false, "save generated transcript")
 	flag.BoolVar(&showVersion, "version", false, "show version")
+	flag.StringVar(&promptfile, "promptfile", "", "user-supplied prompt file")
 	flag.StringVar(&assetdir, "assetdir", ".", "output folder")
 
 	flag.StringVar(&configfile, "config", "", "path to JSON config file")
@@ -250,17 +252,33 @@ func generateConversationFrom(projectID, location, modelName, pdfurl string) (st
 	}
 
 	// create prompt part
-	tmpl := template.Must(
-		template.New("podcast.tpl").ParseFS(promptTemplates, "prompts/podcast.tpl"),
-	)
-	buf := new(bytes.Buffer)
-	err = tmpl.Execute(buf, nil)
+	var prompt string
+
+	// check for user-supplied promptfile
+	if promptfile != "" {
+		log.Printf("using user supplied prompt file: %s", promptfile)
+		promptBytes, err := os.ReadFile(promptfile)
+		if err != nil {
+			log.Printf("using default prompt - unable to read file %s", promptfile)
+		} else {
+			prompt = string(promptBytes)
+		}
+	}
+	// otherwise, use built-in prompt
+	if prompt == "" {
+		tmpl := template.Must(
+			template.New("podcast.tpl").ParseFS(promptTemplates, "prompts/podcast.tpl"),
+		)
+		buf := new(bytes.Buffer)
+		err = tmpl.Execute(buf, nil)
+		prompt = buf.String()
+	}
 
 	// parts for both token count and generation
 	parts := []genai.Part{
 		part,
 		genai.Text(`"\n\n"`),
-		genai.Text(buf.String()),
+		genai.Text(prompt),
 	}
 
 	// count tokens

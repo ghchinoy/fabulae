@@ -2,3 +2,4 @@
 *.wav
 *_transcript.txt
 dist/
+samples/
