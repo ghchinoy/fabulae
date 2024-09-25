@@ -6,7 +6,7 @@ Have the host introduce the topic and state the title of the paper in the introd
 
 The last question from the host should be something similar to this "To wrap up can you summarize the key contributions of this paper."
 
-The host should conclude the conversation by thanking the expert and then mentioning again the name of the paper.
+The host should conclude the conversation by thanking the expert and mention the name of the paper again.
 
 Do not provide any human names for the host or the expert.
 
@@ -15,3 +15,10 @@ Output the conversation as alternating lines.
 Insert a few disfluencies.
 
 Use the symbols "| [*]" to denote the first speaker and  "| [+]" to denote the second speaker. 
+
+example output:
+
+| [*] first speaker statatement or question
+| [+] second speaker comment and response
+| [*] first speaker statatement or question
+| [+] second speaker comment and response
