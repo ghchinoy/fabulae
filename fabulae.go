@@ -20,6 +20,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -126,6 +127,9 @@ func Fabulae(voice1name, voice2name string, conversation string, outputfilename 
 
 	outputfiles := []string{}
 
+	v1re := regexp.MustCompile(`^\|\s\[\*\]`)
+	v2re := regexp.MustCompile(`^\|\s\[\+\]`)
+
 	if turnbyturn {
 		log.Print("turn-by-turn requested")
 		// remove blank lines
@@ -134,10 +138,10 @@ func Fabulae(voice1name, voice2name string, conversation string, outputfilename 
 			if turn == "" {
 				continue
 			} else {
-				turn = strings.Replace(turn, "| [*]", "", 1)
-				turn = strings.Replace(turn, "| [+]\"", "", 1)
+				turn = v1re.ReplaceAllString(turn, "")
+				turn = v2re.ReplaceAllString(turn, "")
 			}
-			cleanturns = append(cleanturns, turn)
+			cleanturns = append(cleanturns, strings.TrimSpace(turn))
 		}
 
 		// goroutines
