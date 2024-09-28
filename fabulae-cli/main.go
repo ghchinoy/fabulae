@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"context"
 	"embed"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -53,6 +54,7 @@ var (
 	showVersion            bool
 	assetdir               string
 	promptfile             string
+	title                  string
 )
 
 //go:embed prompts/*.tpl
@@ -69,6 +71,7 @@ func init() {
 	flag.BoolVar(&saveTranscript, "save-transcript", false, "save generated transcript")
 	flag.BoolVar(&showVersion, "version", false, "show version")
 	flag.StringVar(&promptfile, "promptfile", "", "user-supplied prompt file")
+	flag.StringVar(&title, "label", "", "custom title or label for output file")
 	flag.StringVar(&assetdir, "assetdir", ".", "output folder")
 
 	flag.StringVar(&configfile, "config", "", "path to JSON config file")
@@ -103,9 +106,19 @@ func main() {
 	}
 
 	var conversation string
+	storytype := "podcast"
 
 	// Process PDF URL if provided
 	if pdfurl != "" {
+		if title == "" {
+			title = removeNonAlphanumerics(getTitleOfDocument(pdfurl))
+		}
+		log.Printf("title: %s", title)
+
+		if promptfile != "" {
+			storytype = "custom"
+		}
+
 		var err error
 		conversation, err = createConversationFromPDFURL(pdfurl)
 		if err != nil {
@@ -113,12 +126,17 @@ func main() {
 			os.Exit(1)
 		}
 		if saveTranscript {
-			outputfilename := fmt.Sprintf("%s_transcript.txt", time.Now().Format("20060102.030405.06"))
+			outputfilename := fmt.Sprintf("%s-%s_%s_transcript.txt",
+				storytype,
+				title,
+				time.Now().Format("20060102.030405.06"),
+			)
 			os.WriteFile(outputfilename, []byte(conversation), 0644)
 			log.Printf("transcript saved to: %s", outputfilename)
 		}
 	} else { // Process conversation file if provided
 		//conversationfile := flag.Arg(0)
+		storytype = "transcript"
 		convbytes, err := os.ReadFile(conversationfile)
 		if err != nil {
 			log.Printf("couldn't find %s: %s", conversationfile, err.Error())
@@ -127,11 +145,22 @@ func main() {
 		conversation = string(convbytes)
 	}
 
+	title = fmt.Sprintf("%s-%s", storytype, title)
+
 	// create file name for conversation audio output
-	outputfilename := fmt.Sprintf("%s_%s.wav",
-		strings.Split(conversationfile, ".")[0],
-		time.Now().Format("20060102.030405.06"),
-	)
+	var outputfilename string
+	if title != "" {
+		outputfilename = fmt.Sprintf("%s_%s_%s.wav",
+			strings.Split(conversationfile, ".")[0],
+			title,
+			time.Now().Format("20060102.030405.06"),
+		)
+	} else {
+		outputfilename = fmt.Sprintf("%s_%s.wav",
+			strings.Split(conversationfile, ".")[0],
+			time.Now().Format("20060102.030405.06"),
+		)
+	}
 
 	// Generate audio files from the conversation
 	audiofiles, err := fabulae.Fabulae(voice1name, voice2name, conversation, outputfilename, turnbyturn, striptags)
@@ -140,14 +169,14 @@ func main() {
 	}
 
 	// Combine generated audio files into a single output
-	output := combineWavFiles(audiofiles)
+	output := combineWavFiles(title, audiofiles)
 
 	fmt.Println()
 	fmt.Printf("audio file created: %s\n", output)
 }
 
 // combineWavFiles appends wav files to a single one
-func combineWavFiles(audiolist []string) string {
+func combineWavFiles(title string, audiolist []string) string {
 	wavs := []*wav.File{}
 	for _, i := range audiolist {
 		wavfile := &wav.File{}
@@ -183,7 +212,7 @@ func combineWavFiles(audiolist []string) string {
 
 	file, _ := wav.Marshal(outputwav)
 
-	outputfilename := fmt.Sprintf("%s.wav", time.Now().Format("20060102.030405.06"))
+	outputfilename := fmt.Sprintf("%s_%s.wav", title, time.Now().Format("20060102.030405.06"))
 	os.WriteFile(outputfilename, file, 0644)
 
 	// delete temp files
@@ -245,6 +274,17 @@ func generateConversationFrom(projectID, location, modelName, pdfurl string) (st
 	// set the model name
 	model := client.GenerativeModel(modelName)
 
+	model.SafetySettings = []*genai.SafetySetting{
+		{
+			Category:  genai.HarmCategoryHarassment,
+			Threshold: genai.HarmBlockOnlyHigh,
+		},
+		{
+			Category:  genai.HarmCategoryDangerousContent,
+			Threshold: genai.HarmBlockOnlyHigh,
+		},
+	}
+
 	// create PDF part
 	part := genai.FileData{
 		MIMEType: "application/pdf",
@@ -287,16 +327,6 @@ func generateConversationFrom(projectID, location, modelName, pdfurl string) (st
 	}
 
 	// generate content
-	model.SafetySettings = []*genai.SafetySetting{
-		{
-			Category:  genai.HarmCategoryHarassment,
-			Threshold: genai.HarmBlockOnlyHigh,
-		},
-		{
-			Category:  genai.HarmCategoryDangerousContent,
-			Threshold: genai.HarmBlockOnlyHigh,
-		},
-	}
 	bar := progressbar.NewOptions(
 		-1,
 		progressbar.OptionSetDescription("generating conversation ..."),
@@ -318,6 +348,65 @@ func generateConversationFrom(projectID, location, modelName, pdfurl string) (st
 	}
 
 	return fmt.Sprintf("%s", res.Candidates[0].Content.Parts[0]), nil
+}
+
+// getTitleOfDocument uses Gemini Controlled Generation to output a title
+func getTitleOfDocument(pdfurl string) string {
+
+	ctx := context.Background()
+
+	// create a new generative AI client
+	client, err := genai.NewClient(ctx, projectID, location)
+	if err != nil {
+		log.Printf("unable to create client: %w", err)
+		return ""
+	}
+	defer client.Close()
+
+	model := client.GenerativeModel("gemini-1.5-flash")
+	model.ResponseMIMEType = "application/json"
+
+	// create PDF part
+	documentPart := genai.FileData{
+		MIMEType: "application/pdf",
+		FileURI:  pdfurl,
+	}
+
+	parts := []genai.Part{
+		documentPart,
+		genai.Text(`extract the title only from this document, if there isn't a title, provide a short few word title. Make sure it's in this form only:
+{"title": "title of document"}`)}
+
+	res, err := model.GenerateContent(ctx, parts...)
+	if err != nil {
+		log.Printf("unable to generate title contents: %v", err)
+		return ""
+	}
+	var doc DocumentInfo
+	err = json.Unmarshal([]byte(fmt.Sprintf("%s", res.Candidates[0].Content.Parts[0])), &doc)
+	if err != nil {
+		log.Printf("couldn't unmarshal: %s: %v", res.Candidates[0].Content.Parts[0], err)
+		return ""
+	}
+
+	return doc.Title
+}
+
+type DocumentInfo struct {
+	Title string `json:"title"`
+}
+
+func removeNonAlphanumerics(input string) string {
+	input = strings.ReplaceAll(input, " ", "")
+
+	// Remove all non-alphanumeric characters
+	input = strings.Map(func(r rune) rune {
+		if r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' {
+			return r
+		}
+		return -1
+	}, input)
+	return input
 }
 
 // envCheck checks for an environment variable, otherwise returns default
