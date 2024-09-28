@@ -106,6 +106,7 @@ func main() {
 	}
 
 	var conversation string
+	storytype := "podcast"
 
 	// Process PDF URL if provided
 	if pdfurl != "" {
@@ -114,6 +115,10 @@ func main() {
 		}
 		log.Printf("title: %s", title)
 
+		if promptfile != "" {
+			storytype = "custom"
+		}
+
 		var err error
 		conversation, err = createConversationFromPDFURL(pdfurl)
 		if err != nil {
@@ -121,12 +126,17 @@ func main() {
 			os.Exit(1)
 		}
 		if saveTranscript {
-			outputfilename := fmt.Sprintf("%s_%s_transcript.txt", title, time.Now().Format("20060102.030405.06"))
+			outputfilename := fmt.Sprintf("%s-%s_%s_transcript.txt",
+				storytype,
+				title,
+				time.Now().Format("20060102.030405.06"),
+			)
 			os.WriteFile(outputfilename, []byte(conversation), 0644)
 			log.Printf("transcript saved to: %s", outputfilename)
 		}
 	} else { // Process conversation file if provided
 		//conversationfile := flag.Arg(0)
+		storytype = "transcript"
 		convbytes, err := os.ReadFile(conversationfile)
 		if err != nil {
 			log.Printf("couldn't find %s: %s", conversationfile, err.Error())
@@ -134,6 +144,8 @@ func main() {
 		}
 		conversation = string(convbytes)
 	}
+
+	title = fmt.Sprintf("%s-%s", storytype, title)
 
 	// create file name for conversation audio output
 	var outputfilename string
