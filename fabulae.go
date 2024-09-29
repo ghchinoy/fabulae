@@ -388,7 +388,10 @@ func stripParticipantTags(text string, striptags string) string {
 }
 
 func getSpeechVoicesForName(voicenames []string) map[string]ttspb.VoiceSelectionParams {
-	voices, _ := listVoices()
+	voices, err := listVoices()
+	if err != nil {
+		log.Fatalf("unable to list voices: %v", err)
+	}
 
 	response := make(map[string]ttspb.VoiceSelectionParams, len(voicenames))
 
