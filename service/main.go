@@ -23,9 +23,12 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/ghchinoy/fabulae"
+	"github.com/moutend/go-wav"
 
 	"cloud.google.com/go/storage"
 )
@@ -100,12 +103,16 @@ func handleSynthesis(w http.ResponseWriter, r *http.Request) {
 		}
 
 	} else { // 2 voice conversation
-		outputfiles, err := fabulae.Fabulae(fabulaeRequest.Voice1Name, fabulaeRequest.Voice2Name, fabulaeRequest.Conversation, "", false, "")
+		outputfiles, err := fabulae.Fabulae(fabulaeRequest.Voice1Name, fabulaeRequest.Voice2Name, fabulaeRequest.Conversation, "", true, "")
 		if err != nil {
 			http.Error(w, "error synthesizing", http.StatusInternalServerError)
 			return
 		}
 		log.Printf("outputfiles: %s", outputfiles)
+
+		// join
+		combinedWavFile := combineWavFiles("new", outputfiles)
+		outputfiles = []string{combinedWavFile}
 
 		response = FabulaeResponse{"", outputfiles}
 		err = moveFilesToAudioBucket(outputfiles)
@@ -121,6 +128,48 @@ func handleSynthesis(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Print(err)
 	}
+}
+
+// combineWavFiles appends wav files to a single one
+func combineWavFiles(title string, audiolist []string) string {
+	wavs := []*wav.File{}
+	for _, i := range audiolist {
+		wavfile := &wav.File{}
+		audiofile := filepath.Join(".", i)
+		audiobytes, err := os.ReadFile(audiofile)
+		if err != nil {
+			log.Fatalf("can't read %s: %v", audiofile, err)
+		}
+		wav.Unmarshal(audiobytes, wavfile)
+		wavs = append(wavs, wavfile)
+	}
+	log.Printf("Samples per sec: %d, Bits per sample: %d, Channels: %d",
+		wavs[0].SamplesPerSec(),
+		wavs[0].BitsPerSample(),
+		wavs[0].Channels(),
+	)
+	log.Printf("%d wav files", len(wavs))
+
+	// combine all wavs into one
+	outputwav, _ := wav.New(wavs[0].SamplesPerSec(), wavs[0].BitsPerSample(), wavs[0].Channels())
+	for _, wav := range wavs {
+		io.Copy(outputwav, wav)
+	}
+
+	file, _ := wav.Marshal(outputwav)
+
+	outputfilename := fmt.Sprintf("%s_%s.wav", title, time.Now().Format("20060102.030405.06"))
+	os.WriteFile(outputfilename, file, 0644)
+
+	// delete temp files
+	for _, i := range audiolist {
+		err := os.Remove(i)
+		if err != nil {
+			log.Printf("os.Remove: %v", err)
+		}
+	}
+
+	return outputfilename
 }
 
 func moveFilesToAudioBucket(outputfiles []string) error {
