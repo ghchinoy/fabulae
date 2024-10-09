@@ -291,15 +291,16 @@ func processAudioTurns(turns []turnconfig) []string {
 func synthesizeWithVoice(ctx context.Context, voice ttspb.VoiceSelectionParams, turn string) ([]byte, error) {
 	//log.Printf("voice: %s", voice.Name)
 	opts := []option.ClientOption{}
-	if strings.Contains(voice.Name, "Neural") {
-		opts = append(opts, option.WithEndpoint("texttospeech.googleapis.com:443"))
-	}
+	//if strings.Contains(voice.Name, "Neural") {
+	//	opts = append(opts, option.WithEndpoint("texttospeech.googleapis.com:443"))
+	//}
 	client, err := texttospeech.NewClient(ctx, opts...)
 	if err != nil {
 		return []byte{}, err
 	}
 	defer client.Close()
 
+	//log.Printf("Using: %s", jsonify(voice))
 	req := ttspb.SynthesizeSpeechRequest{
 		Input: &ttspb.SynthesisInput{
 			InputSource: &ttspb.SynthesisInput_Text{Text: turn},
@@ -402,7 +403,7 @@ func getSpeechVoicesForName(voicenames []string) map[string]ttspb.VoiceSelection
 				voice := ttspb.VoiceSelectionParams{
 					Name:         v.Name,
 					SsmlGender:   v.SsmlGender,
-					LanguageCode: "en-US",
+					LanguageCode: v.LanguageCodes[0], //"en-US",
 				}
 				response[name] = voice
 				continue

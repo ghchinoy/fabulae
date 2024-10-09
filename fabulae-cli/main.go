@@ -83,7 +83,6 @@ func init() {
 }
 
 func main() {
-
 	if showVersion {
 		fmt.Printf("fabulae %s\n", version)
 		//flag.Usage()
@@ -365,6 +364,16 @@ func getTitleOfDocument(pdfurl string) string {
 
 	model := client.GenerativeModel("gemini-1.5-flash")
 	model.ResponseMIMEType = "application/json"
+	model.SafetySettings = []*genai.SafetySetting{
+		{
+			Category:  genai.HarmCategoryHarassment,
+			Threshold: genai.HarmBlockOnlyHigh,
+		},
+		{
+			Category:  genai.HarmCategoryDangerousContent,
+			Threshold: genai.HarmBlockOnlyHigh,
+		},
+	}
 
 	// create PDF part
 	documentPart := genai.FileData{
