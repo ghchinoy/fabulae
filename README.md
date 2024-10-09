@@ -50,3 +50,11 @@ The GCS bucket must be specified in an environment variable, without the `gs://`
 ```
 export GCS_AUDIO_BUCKET=my-bucket/audio-folder
 ```
+
+# Related
+
+For the parent solution, see [GenMedia Studio](https://github.com/GoogleCloudPlatform/vertex-ai-creative-studio)
+
+# Disclaimer
+
+This is not an officially supported Google product.
