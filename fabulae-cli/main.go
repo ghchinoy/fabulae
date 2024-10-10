@@ -110,7 +110,9 @@ func main() {
 	// Process PDF URL if provided
 	if pdfurl != "" {
 		if title == "" {
-			title = removeNonAlphanumerics(getTitleOfDocument(pdfurl))
+			title = getTitleOfDocument(pdfurl)
+			log.Printf("Document title: %s", title)
+			title = removeNonAlphanumerics(title)
 		}
 		log.Printf("title: %s", title)
 
@@ -352,7 +354,8 @@ func generateConversationFrom(projectID, location, modelName, pdfurl string) (st
 // getTitleOfDocument uses Gemini Controlled Generation to output a title
 func getTitleOfDocument(pdfurl string) string {
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*120))
+	defer cancel()
 
 	// create a new generative AI client
 	client, err := genai.NewClient(ctx, projectID, location)
@@ -398,7 +401,11 @@ func getTitleOfDocument(pdfurl string) string {
 		return ""
 	}
 
-	return doc.Title
+	title := doc.Title
+	if len(doc.Title) > 50 {
+		title = title[:50]
+	}
+	return title
 }
 
 type DocumentInfo struct {
