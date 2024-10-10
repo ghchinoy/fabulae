@@ -67,7 +67,7 @@ func init() {
 	// Define command-line flags
 	flag.StringVar(&conversationfile, "conversationfile", "", "path to transcript")
 	flag.StringVar(&pdfurl, "pdf-url", "", "URL for PDF")
-	flag.StringVar(&modelName, "model", "gemini-1.5-flash", "generative model name")
+	flag.StringVar(&modelName, "model", "gemini-1.5-pro", "generative model name")
 	flag.BoolVar(&saveTranscript, "save-transcript", false, "save generated transcript")
 	flag.BoolVar(&showVersion, "version", false, "show version")
 	flag.StringVar(&promptfile, "promptfile", "", "user-supplied prompt file")
@@ -357,7 +357,7 @@ func getTitleOfDocument(pdfurl string) string {
 	// create a new generative AI client
 	client, err := genai.NewClient(ctx, projectID, location)
 	if err != nil {
-		log.Printf("unable to create client: %w", err)
+		log.Printf("unable to create client: %v", err)
 		return ""
 	}
 	defer client.Close()

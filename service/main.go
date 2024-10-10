@@ -102,7 +102,7 @@ func handleSynthesis(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-	} else { // 2 voice conversation
+	} else { // two-voice conversation
 		outputfiles, err := fabulae.Fabulae(fabulaeRequest.Voice1Name, fabulaeRequest.Voice2Name, fabulaeRequest.Conversation, "", true, "")
 		if err != nil {
 			http.Error(w, "error synthesizing", http.StatusInternalServerError)
