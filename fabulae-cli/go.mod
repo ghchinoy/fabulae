@@ -1,4 +1,4 @@
-module github.com/ghchinoy/fabulae/cli
+module github.com/ghchinoy/fabulae/fabulae-cli
 
 go 1.23.2
 
