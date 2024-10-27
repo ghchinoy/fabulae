@@ -2,12 +2,13 @@
 
 Fabulae creates an audio conversation from a given PDF URL or a text transcript.
 
+The primary example is a command-line tool, `fabulae`, but there's also a webservice.
+
 
 ## Prerequisites
 
-* Google Cloud Project
+* Google Cloud Project with Cloud Services enabled
 * [Go](https://go.dev/doc/install)
-* Services enabled
 * Environment variable for your Project ID
 * Fabulae CLI
 
@@ -15,13 +16,13 @@ Fabulae creates an audio conversation from a given PDF URL or a text transcript.
 # enable services
 gcloud services enable texttospeech.googleapis.com aiplatform.googleapis.com
 
-# set project
+# set project ID environment variable
 export PROJECT_ID=$(gcloud config get project)
 ```
 
 ```
 # install the fabluae cli
-go install github.com/ghchinoy/fabulae/fabulae-cli@latest
+go install github.com/ghchinoy/fabulae/cli@latest
 ```
 
 ## Try it

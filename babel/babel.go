@@ -41,9 +41,6 @@ const timeformat = "20060102.030405.06"
 func init() {
 	flag.StringVar(&service, "service", "false", "start as service")
 	flag.Parse()
-}
-
-func main() {
 	// project setup
 	// Get Google Cloud Project ID from environment variable
 	projectID = envCheck("PROJECT_ID", "") // no default
@@ -60,6 +57,9 @@ func main() {
 		log.Fatalf("cannot listJourneyVoices: %v", err)
 	}
 	log.Printf("%d Journey voices", len(voices))
+}
+
+func main() {
 
 	// run as service, env var precedence
 	service = envCheck("SERVICE", service)
@@ -72,7 +72,7 @@ func main() {
 		babelbucket = envCheck("BABEL_BUCKET", fmt.Sprintf("%s-fabulae", projectID))
 		babelpath = envCheck("BABEL_PATH", "babel")
 		log.Printf("using gs://%s/%s", babelbucket, babelpath)
-		http.HandleFunc("POST /synthesize", handleSynthesis)
+		http.HandleFunc("POST /synthesize", HandleSynthesis)
 		http.HandleFunc("GET /voices", HandleListVoices)
 		http.ListenAndServe(fmt.Sprintf(":%s", port), nil)
 	}
@@ -136,8 +136,8 @@ type VoiceMetadata struct {
 	LanguageCodes []string `json:"language_codes"`
 }
 
-// handleSynthesis
-func handleSynthesis(w http.ResponseWriter, r *http.Request) {
+// HandleSynthesis receives the request and creates all voices
+func HandleSynthesis(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "unable to process body", http.StatusInternalServerError)
