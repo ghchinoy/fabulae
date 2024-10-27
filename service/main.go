@@ -28,12 +28,20 @@ import (
 	"time"
 
 	"github.com/ghchinoy/fabulae"
+	"github.com/ghchinoy/fabulae/babel"
 	"github.com/moutend/go-wav"
 
 	"cloud.google.com/go/storage"
+	"cloud.google.com/go/texttospeech/apiv1/texttospeechpb"
 )
 
 var audioBucketPath string
+
+var (
+	projectID string
+	location  string
+	voices    []*texttospeechpb.Voice
+)
 
 type FabulaeRequest struct {
 	Voice1Name   string `json:"voice1"`
@@ -57,7 +65,24 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Get Google Cloud Project ID from environment variable
+	projectID = envCheck("PROJECT_ID", "") // no default
+	if projectID == "" {
+		log.Fatalf("please set env var PROJECT_ID with google cloud project, e.g. export PROJECT_ID=$(gcloud config get project)")
+	}
+	// Get Google Cloud Region from environment variable
+	location = envCheck("REGION", "us-central1") // default is us-central1
+
+	// get all journey voices
+	var err error
+	voices, err = babel.ListJourneyVoices()
+	if err != nil {
+		log.Fatalf("cannot listJourneyVoices: %v", err)
+	}
+	log.Printf("%d Journey voices", len(voices))
+
 	http.HandleFunc("POST /synthesize", handleSynthesis)
+	http.HandleFunc("GET /voices", babel.HandleListVoices)
 	http.ListenAndServe(fmt.Sprintf(":%s", port), nil)
 }
 
@@ -213,4 +238,15 @@ func moveFilesToAudioBucket(outputfiles []string) error {
 	}
 
 	return nil
+}
+
+// envCheck checks for an environment variable, otherwise returns default
+func envCheck(environmentVariable, defaultVar string) string {
+	if envar, ok := os.LookupEnv(environmentVariable); !ok {
+		return defaultVar
+	} else if envar == "" {
+		return defaultVar
+	} else {
+		return envar
+	}
 }
