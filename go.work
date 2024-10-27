@@ -2,7 +2,7 @@ go 1.23.2
 
 use (
 	./babel
-	./cli
+	./fabulae-cli
 	./core
 	./service
 )
