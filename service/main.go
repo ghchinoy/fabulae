@@ -16,7 +16,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -24,26 +23,36 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/ghchinoy/fabulae"
+	"github.com/ghchinoy/fabulae/babel"
 	"github.com/moutend/go-wav"
 
-	"cloud.google.com/go/storage"
+	"cloud.google.com/go/texttospeech/apiv1/texttospeechpb"
 )
 
 var audioBucketPath string
 
+var (
+	projectID string
+	location  string
+	voices    []*texttospeechpb.Voice
+)
+
 type FabulaeRequest struct {
+	PDFURL       string `json:"pdf_url"`
 	Voice1Name   string `json:"voice1"`
 	Voice2Name   string `json:"voice2"`
 	Conversation string `json:"conversation"`
 }
 
 type FabulaeResponse struct {
-	ErrorMessage string   `json:"errormessage,omitempty"`
-	OutputFiles  []string `json:"outputfiles"`
+	ErrorMessage  string   `json:"errormessage,omitempty"`
+	OutputFiles   []string `json:"outputfiles"`
+	AudioURI      string   `json:"audio_uri"`
+	TranscriptURI string   `json:"transcript_uri"`
+	Title         string   `json:"title"`
 }
 
 func main() {
@@ -57,10 +66,23 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Get Google Cloud Project ID from environment variable
+	projectID = envCheck("PROJECT_ID", "") // no default
+	if projectID == "" {
+		log.Fatalf("please set env var PROJECT_ID with google cloud project, e.g. export PROJECT_ID=$(gcloud config get project)")
+	}
+	// Get Google Cloud Region from environment variable
+	location = envCheck("REGION", "us-central1") // default is us-central1
+
 	http.HandleFunc("POST /synthesize", handleSynthesis)
-	http.ListenAndServe(fmt.Sprintf(":%s", port), nil)
+	http.HandleFunc("GET /voices", babel.HandleListVoices)
+	http.HandleFunc("POST /babel", babel.HandleSynthesis)
+	if err := http.ListenAndServe(fmt.Sprintf(":%s", port), nil); err != nil {
+		log.Fatalf("error starting service: %v", err)
+	}
 }
 
+// handleSynthesis handles the Fabulae conversation creation and synthesis
 func handleSynthesis(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -76,13 +98,40 @@ func handleSynthesis(w http.ResponseWriter, r *http.Request) {
 	log.Print("synthesizing... ")
 
 	var fabulaeRequest FabulaeRequest
+	var response FabulaeResponse
+
 	err = json.NewDecoder(bytes.NewReader(body)).Decode(&fabulaeRequest)
 	if err != nil {
 		http.Error(w, "error decoding Fabulae Request", http.StatusInternalServerError)
 		return
 	}
 
-	var response FabulaeResponse
+	storytype := "podcast"
+
+	if fabulaeRequest.PDFURL != "" {
+		// obtain the PDF & store the PDF
+		gcsURI, err := addPDFSourceToGCS(fabulaeRequest.PDFURL)
+		if err != nil {
+			log.Printf("error addPDFSourceToGCS: %v", err)
+			http.Error(w, "error obtaining source", http.StatusInternalServerError)
+			return
+		}
+		// create conversation
+		fabulaeRequest.Conversation, err = createConversationFromPDFURL(gcsURI)
+		if err != nil {
+			log.Printf("error createConversationFromPDFURL: %v", err)
+			http.Error(w, "error creating conversation", http.StatusInternalServerError)
+			return
+		}
+
+		response.Title = getTitleOfDocument(gcsURI)
+
+		// default voices if there are none
+		if fabulaeRequest.Voice1Name == "" {
+			fabulaeRequest.Voice1Name = "en-US-Journey-D"
+			fabulaeRequest.Voice2Name = "en-US-Journey-F"
+		}
+	}
 
 	if fabulaeRequest.Voice2Name == "" { // single voice text synthesis (aka speak)
 		log.Print("single voice")
@@ -95,7 +144,7 @@ func handleSynthesis(w http.ResponseWriter, r *http.Request) {
 		outputfiles := []string{}
 		outputfiles = append(outputfiles, outputfile)
 		log.Printf("outputfiles: %s", outputfiles)
-		response = FabulaeResponse{"", outputfiles}
+		response.OutputFiles = outputfiles
 		err = moveFilesToAudioBucket(outputfiles)
 		if err != nil {
 			http.Error(w, "error writing to Storage", http.StatusInternalServerError)
@@ -113,8 +162,20 @@ func handleSynthesis(w http.ResponseWriter, r *http.Request) {
 		// join
 		combinedWavFile := combineWavFiles("new", outputfiles)
 		outputfiles = []string{combinedWavFile}
+		response.OutputFiles = outputfiles
+		response.AudioURI = outputfiles[0]
 
-		response = FabulaeResponse{"", outputfiles}
+		// transcript
+		filetitle := removeNonAlphanumerics(response.Title)
+		transcriptfilename := fmt.Sprintf("%s-%s_%s_transcript.txt",
+			storytype,
+			filetitle,
+			time.Now().Format("20060102.030405.06"),
+		)
+		os.WriteFile(transcriptfilename, []byte(fabulaeRequest.Conversation), 0644)
+		response.TranscriptURI = transcriptfilename
+
+		outputfiles = append(outputfiles, transcriptfilename)
 		err = moveFilesToAudioBucket(outputfiles)
 		if err != nil {
 			http.Error(w, "error writing to Storage", http.StatusInternalServerError)
@@ -172,45 +233,13 @@ func combineWavFiles(title string, audiolist []string) string {
 	return outputfilename
 }
 
-func moveFilesToAudioBucket(outputfiles []string) error {
-	ctx := context.Background()
-	client, err := storage.NewClient(ctx)
-	if err != nil {
-		log.Fatal(err)
+// envCheck checks for an environment variable, otherwise returns default
+func envCheck(environmentVariable, defaultVar string) string {
+	if envar, ok := os.LookupEnv(environmentVariable); !ok {
+		return defaultVar
+	} else if envar == "" {
+		return defaultVar
+	} else {
+		return envar
 	}
-	defer client.Close()
-
-	parts := strings.Split(audioBucketPath, "/")
-	bucketName := parts[0]
-	storagePath := strings.Join(parts[1:], "/")
-
-	for _, audiofile := range outputfiles {
-		objectName := fmt.Sprintf("%s/%s", storagePath, audiofile)
-		f, err := os.Open(audiofile)
-		if err != nil {
-			log.Printf("unable to open file %s: %v", audiofile, err)
-			return err
-		}
-		defer f.Close()
-
-		log.Printf("writing to %s %s", bucketName, objectName)
-		o := client.Bucket(bucketName).Object(objectName)
-
-		o = o.If(storage.Conditions{DoesNotExist: true})
-
-		wc := o.NewWriter(ctx)
-		if _, err = io.Copy(wc, f); err != nil {
-			return fmt.Errorf("io.Copy: %w", err)
-		}
-		if err := wc.Close(); err != nil {
-			return fmt.Errorf("Writer.Close: %w", err)
-		}
-
-		err = os.Remove(audiofile)
-		if err != nil {
-			return fmt.Errorf("os.Remove: %w", err)
-		}
-	}
-
-	return nil
 }
