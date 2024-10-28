@@ -25,8 +25,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/ghchinoy/fabulae"
 	"github.com/ghchinoy/fabulae/babel"
+	fabulae "github.com/ghchinoy/fabulae/core"
 	"github.com/moutend/go-wav"
 
 	"cloud.google.com/go/texttospeech/apiv1/texttospeechpb"
