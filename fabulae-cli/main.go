@@ -33,7 +33,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/vertexai/genai"
-	"github.com/ghchinoy/fabulae"
+	fabulae "github.com/ghchinoy/fabulae/core"
 	"github.com/k0kubun/go-ansi"
 	"github.com/schollz/progressbar/v3"
 
