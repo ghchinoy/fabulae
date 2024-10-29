@@ -28,8 +28,9 @@ var (
 	location    string
 	service     string
 	babelbucket string
-	babelpath   string
+	babelpath   string = "babel"
 	voices      []*texttospeechpb.Voice
+	port        string = "8080"
 )
 
 var languageDescriptions = map[string]string{
@@ -60,16 +61,15 @@ func init() {
 }
 
 func main() {
-
 	// run as service, env var precedence
 	service = envCheck("SERVICE", service)
 
 	if service != "false" {
-		port := os.Getenv("PORT")
+		port = os.Getenv("PORT")
 		if port == "" {
 			port = "8080"
 		}
-		babelbucket = envCheck("BABEL_BUCKET", fmt.Sprintf("%s-fabulae", projectID))
+		babelbucket = envCheck("GCS_AUDIO_BUCKET", fmt.Sprintf("%s-fabulae", projectID))
 		babelpath = envCheck("BABEL_PATH", "babel")
 		log.Printf("using gs://%s/%s", babelbucket, babelpath)
 		http.HandleFunc("POST /synthesize", HandleSynthesis)
@@ -106,7 +106,6 @@ func main() {
 	audioGenerationSpinner.Finish()
 	fmt.Println()
 	log.Printf("complete. wrote %d files", len(outputfiles))
-
 }
 
 // BabelOutput represents the metatdata for the translated audio generated
@@ -158,6 +157,9 @@ func HandleSynthesis(w http.ResponseWriter, r *http.Request) {
 
 	log.Print("synthesizing... ")
 
+	babelbucket = envCheck("GCS_AUDIO_BUCKET", fmt.Sprintf("%s-fabulae", projectID))
+	log.Printf("babel bucket: %s", babelbucket)
+
 	// core babel functionality
 	// languages
 	languages := getAllLanguages()
@@ -172,8 +174,10 @@ func HandleSynthesis(w http.ResponseWriter, r *http.Request) {
 	for _, translation := range outputmetadata {
 		outputfiles = append(outputfiles, translation.AudioPath)
 	}
+	log.Printf("generated %d files", len(outputfiles))
 	err = moveFilesToAudioBucket(outputfiles)
 	if err != nil {
+		log.Printf("error moveFilesToAudioBucket: %v", err)
 		http.Error(w, "error writing to Storage", http.StatusInternalServerError)
 		return
 	}
@@ -220,6 +224,7 @@ func moveFilesToAudioBucket(outputfiles []string) error {
 	parts := strings.Split(fmt.Sprintf("%s/%s", babelbucket, babelpath), "/")
 	bucketName := parts[0]
 	storagePath := strings.Join(parts[1:], "/")
+	log.Printf("storage path: %s", storagePath)
 
 	for _, audiofile := range outputfiles {
 		objectName := fmt.Sprintf("%s/%s", storagePath, audiofile)
