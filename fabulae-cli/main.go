@@ -63,24 +63,29 @@ var promptTemplates embed.FS // Embed prompt templates from the prompts director
 //go:embed version
 var version string
 
-func init() {
-	// Define command-line flags
+// parseFlags defines and parses command-line flags
+func parseFlags() {
 	flag.StringVar(&conversationfile, "conversationfile", "", "path to transcript")
 	flag.StringVar(&pdfurl, "pdf-url", "", "URL for PDF")
 	flag.StringVar(&modelName, "model", "gemini-1.5-pro", "generative model name")
 	flag.BoolVar(&saveTranscript, "save-transcript", false, "save generated transcript")
 	flag.BoolVar(&showVersion, "version", false, "show version")
 	flag.StringVar(&promptfile, "promptfile", "", "user-supplied prompt file")
-	flag.StringVar(&title, "label", "", "custom title or label for output file")
-	flag.StringVar(&assetdir, "assetdir", ".", "output folder")
++	flag.StringVar(&title, "label", "", "custom title or label for output file")
++	flag.StringVar(&assetdir, "assetdir", ".", "output folder")
++
++	flag.StringVar(&configfile, "config", "", "path to JSON config file")
++	flag.StringVar(&voice1name, "voice1", "en-US-Journey-D", "voice 1")
++	flag.StringVar(&voice2name, "voice2", "en-US-Journey-F", "voice 2")
++	flag.StringVar(&striptags, "strip", "AGENT,CUSTOMER", "particpant labels to split")
++	flag.BoolVar(&turnbyturn, "turn-by-turn", true, "output each turn as a wav")
++	flag.Parse()
++}
 
-	flag.StringVar(&configfile, "config", "", "path to JSON config file")
-	flag.StringVar(&voice1name, "voice1", "en-US-Journey-D", "voice 1")
-	flag.StringVar(&voice2name, "voice2", "en-US-Journey-F", "voice 2")
-	flag.StringVar(&striptags, "strip", "AGENT,CUSTOMER", "particpant labels to split")
-	flag.BoolVar(&turnbyturn, "turn-by-turn", true, "output each turn as a wav")
-	flag.Parse()
+func init() {
+	parseFlags()
 }
+
 
 func main() {
 	if showVersion {
