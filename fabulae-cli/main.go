@@ -63,8 +63,8 @@ var promptTemplates embed.FS // Embed prompt templates from the prompts director
 //go:embed version
 var version string
 
-func init() {
-	// Define command-line flags
+// parseFlags defines and parses command-line flags
+func parseFlags() {
 	flag.StringVar(&conversationfile, "conversationfile", "", "path to transcript")
 	flag.StringVar(&pdfurl, "pdf-url", "", "URL for PDF")
 	flag.StringVar(&modelName, "model", "gemini-1.5-pro", "generative model name")
@@ -80,6 +80,10 @@ func init() {
 	flag.StringVar(&striptags, "strip", "AGENT,CUSTOMER", "particpant labels to split")
 	flag.BoolVar(&turnbyturn, "turn-by-turn", true, "output each turn as a wav")
 	flag.Parse()
+}
+
+func init() {
+	parseFlags()
 }
 
 func main() {
@@ -278,11 +282,11 @@ func generateConversationFrom(projectID, location, modelName, pdfurl string) (st
 	model.SafetySettings = []*genai.SafetySetting{
 		{
 			Category:  genai.HarmCategoryHarassment,
-			Threshold: genai.HarmBlockOnlyHigh,
+			Threshold: genai.HarmBlockNone,
 		},
 		{
 			Category:  genai.HarmCategoryDangerousContent,
-			Threshold: genai.HarmBlockOnlyHigh,
+			Threshold: genai.HarmBlockNone,
 		},
 	}
 
