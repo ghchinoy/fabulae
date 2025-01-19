@@ -71,21 +71,20 @@ func parseFlags() {
 	flag.BoolVar(&saveTranscript, "save-transcript", false, "save generated transcript")
 	flag.BoolVar(&showVersion, "version", false, "show version")
 	flag.StringVar(&promptfile, "promptfile", "", "user-supplied prompt file")
-+	flag.StringVar(&title, "label", "", "custom title or label for output file")
-+	flag.StringVar(&assetdir, "assetdir", ".", "output folder")
-+
-+	flag.StringVar(&configfile, "config", "", "path to JSON config file")
-+	flag.StringVar(&voice1name, "voice1", "en-US-Journey-D", "voice 1")
-+	flag.StringVar(&voice2name, "voice2", "en-US-Journey-F", "voice 2")
-+	flag.StringVar(&striptags, "strip", "AGENT,CUSTOMER", "particpant labels to split")
-+	flag.BoolVar(&turnbyturn, "turn-by-turn", true, "output each turn as a wav")
-+	flag.Parse()
-+}
+	flag.StringVar(&title, "label", "", "custom title or label for output file")
+	flag.StringVar(&assetdir, "assetdir", ".", "output folder")
+
+	flag.StringVar(&configfile, "config", "", "path to JSON config file")
+	flag.StringVar(&voice1name, "voice1", "en-US-Journey-D", "voice 1")
+	flag.StringVar(&voice2name, "voice2", "en-US-Journey-F", "voice 2")
+	flag.StringVar(&striptags, "strip", "AGENT,CUSTOMER", "particpant labels to split")
+	flag.BoolVar(&turnbyturn, "turn-by-turn", true, "output each turn as a wav")
+	flag.Parse()
+}
 
 func init() {
 	parseFlags()
 }
-
 
 func main() {
 	if showVersion {
@@ -283,11 +282,11 @@ func generateConversationFrom(projectID, location, modelName, pdfurl string) (st
 	model.SafetySettings = []*genai.SafetySetting{
 		{
 			Category:  genai.HarmCategoryHarassment,
-			Threshold: genai.HarmBlockOnlyHigh,
+			Threshold: genai.HarmBlockNone,
 		},
 		{
 			Category:  genai.HarmCategoryDangerousContent,
-			Threshold: genai.HarmBlockOnlyHigh,
+			Threshold: genai.HarmBlockNone,
 		},
 	}
 
