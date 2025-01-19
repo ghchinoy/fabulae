@@ -278,11 +278,15 @@ func generateConversationFrom(projectID, location, modelName, pdfurl string) (st
 	model.SafetySettings = []*genai.SafetySetting{
 		{
 			Category:  genai.HarmCategoryHarassment,
-			Threshold: genai.HarmBlockOnlyHigh,
+			Threshold: genai.HarmBlockNone,
 		},
 		{
 			Category:  genai.HarmCategoryDangerousContent,
-			Threshold: genai.HarmBlockOnlyHigh,
+			Threshold: genai.HarmBlockNone,
+		},
+		{
+			Category:  genai.HarmCategoryHateSpeech,
+			Threshold: genai.HarmBlockNone,
 		},
 	}
 
