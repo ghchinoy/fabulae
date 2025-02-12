@@ -37,6 +37,25 @@ var languageDescriptions = map[string]string{
 	"es-US": "Mexican Spanish",
 }
 
+// newTextToSpeechClient creates a new text to speech client
+func newTextToSpeechClient(ctx context.Context) (*texttospeech.Client, error) {
+	client, err := texttospeech.NewClient(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("texttospeech.NewClient: %w", err)
+	}
+	return client, nil
+}
+
+// newStorageClient creates a new storage client
+func newStorageClient(ctx context.Context) (*storage.Client, error) {
+	client, err := storage.NewClient(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("storage.NewClient: %w", err)
+	}
+	return client, nil
+}
+
+
 const timeformat = "20060102.030405.06"
 
 func init() {
@@ -137,6 +156,7 @@ type VoiceMetadata struct {
 
 // HandleSynthesis receives the request and creates all voices
 func HandleSynthesis(w http.ResponseWriter, r *http.Request) {
+    // HandleSynthesis receives the request and creates all voices
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "unable to process body", http.StatusInternalServerError)
@@ -215,9 +235,9 @@ func HandleListVoices(w http.ResponseWriter, r *http.Request) {
 // moveFilesToAudioBucket moves a list of files to the bucket/path provided
 func moveFilesToAudioBucket(outputfiles []string) error {
 	ctx := context.Background()
-	client, err := storage.NewClient(ctx)
+	client, err := newStorageClient(ctx)
 	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("failed to create storage client: %w", err)
 	}
 	defer client.Close()
 
@@ -230,8 +250,7 @@ func moveFilesToAudioBucket(outputfiles []string) error {
 		objectName := fmt.Sprintf("%s/%s", storagePath, audiofile)
 		f, err := os.Open(audiofile)
 		if err != nil {
-			log.Printf("unable to open file %s: %v", audiofile, err)
-			return err
+			return fmt.Errorf("unable to open file %s: %w", audiofile, err)
 		}
 		defer f.Close()
 
@@ -438,10 +457,9 @@ func generateSpeech(voices []*texttospeechpb.Voice, translations map[string]stri
 // synthesizeWithVoice takes a string and a voice and returns audio bytes using GCP TTS
 func synthesizeWithVoice(ctx context.Context, voice *texttospeechpb.Voice, turn string) ([]byte, error) {
 
-	opts := []option.ClientOption{}
-	client, err := texttospeech.NewClient(ctx, opts...)
+	client, err := newTextToSpeechClient(ctx)
 	if err != nil {
-		return []byte{}, err
+		return []byte{}, fmt.Errorf("failed to create TTS client: %w", err)
 	}
 	defer client.Close()
 
@@ -463,7 +481,7 @@ func synthesizeWithVoice(ctx context.Context, voice *texttospeechpb.Voice, turn 
 	}
 	resp, err := client.SynthesizeSpeech(ctx, &req)
 	if err != nil {
-		return []byte{}, err
+		return []byte{}, fmt.Errorf("failed to synthesize speech: %w", err)
 	}
 	return resp.AudioContent, nil
 }

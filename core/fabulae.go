@@ -38,35 +38,39 @@ var striptags string
 
 const timeformat = "20060102.030405.06"
 
+// Speak synthesizes the given text using the specified voice and returns the output filename.
 func Speak(voice1name string, text string, gcsbucket string) (string, error) {
 	outputfilename := fmt.Sprintf("%s.wav", time.Now().Format(timeformat))
-	//voices := voice(voice1name)
+	// Get the voice configuration.
 	voices := getSpeechVoicesForName([]string{voice1name})
 
-	log.Printf("Using: %s", jsonify(voices[voice1name]))
-	log.Printf("text length: %d", len(text))
-	log.Printf("output: %s", outputfilename)
-	log.Printf("synthesizing ...")
+    log.Printf("Using voice: %s", jsonify(voices[voice1name]))
+	log.Printf("Text length: %d", len(text))
+	log.Printf("Output file: %s", outputfilename)
+	log.Println("Synthesizing...")
 
-	// generate audio
+	// Create a text-to-speech client.
 	ctx := context.Background()
-
-	client, err := texttospeech.NewClient(ctx)
+	client, err := newTextToSpeechClient(ctx)
 	if err != nil {
-		return outputfilename, err
+		return "", fmt.Errorf("failed to create TTS client: %w", err)
 	}
 	defer client.Close()
 
 	//var input ttspb.SynthesisInput
+	// Configure the synthesis input.
 	input := ttspb.SynthesisInput{
 		InputSource: &ttspb.SynthesisInput_Text{Text: text},
 	}
 	//log.Printf("%s", string(ssml))
+    // Check if the input text exceeds the character limit
 	if len(string(text)) > 5000 {
 		return "", fmt.Errorf("too many characters: %d", len(text))
 	}
 
+	// Get the voice.
 	voice := voices[voice1name]
+    // Configure the synthesis request.
 	req := ttspb.SynthesizeSpeechRequest{
 		Input: &input,
 		Voice: &voice,
@@ -74,33 +78,43 @@ func Speak(voice1name string, text string, gcsbucket string) (string, error) {
 			AudioEncoding: ttspb.AudioEncoding_LINEAR16,
 		},
 	}
+	// Perform the text-to-speech synthesis.
 	resp, err := client.SynthesizeSpeech(ctx, &req)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to synthesize speech: %w", err)
 	}
 	audiobytes := resp.AudioContent
 
 	// write audio to output file and report
+	// Write the audio content to a file.
 	err = os.WriteFile(outputfilename, audiobytes, 0644)
 	if err != nil {
-		log.Printf("unable to write to %s: %v", outputfilename, err)
-		os.Exit(1)
+        return "", fmt.Errorf("failed to write audio to file %s: %w", outputfilename, err)
 	}
 	log.Printf("Written %d bytes", len(audiobytes))
 	fmt.Fprintf(os.Stdout, "Audio content written to file: %v\n", outputfilename)
 
 	// report
+	// Report the duration of the audio file
 	f, err := os.Open(outputfilename)
 	if err != nil {
-		log.Fatal(err)
+        return "", fmt.Errorf("failed to open audio file %s: %w", outputfilename, err)
 	}
 	defer f.Close()
 	dur, err := wav.NewDecoder(f).Duration()
 	if err != nil {
-		log.Fatal(err)
+        return "", fmt.Errorf("failed to get audio duration: %w", err)
 	}
 	fmt.Printf("%s duration: %s\n", f.Name(), dur)
 	return outputfilename, nil
+}
+
+// getOutputFilename returns a formatted output filename
+func getOutputFilename(outputfilename string) string {
+	if outputfilename == "" {
+		outputfilename = fmt.Sprintf("%s.wav", time.Now().Format(timeformat))
+	}
+	return outputfilename
 }
 
 type turnconfig struct {
@@ -110,23 +124,24 @@ type turnconfig struct {
 	OutputFilename string
 }
 
+// Fabulae synthesizes a conversation using two voices, optionally turn-by-turn, and returns the output file names.
 func Fabulae(voice1name, voice2name string, conversation string, outputfilename string, turnbyturn bool, tags string) ([]string, error) {
 	striptags = tags
 
-	if outputfilename == "" {
-		outputfilename = fmt.Sprintf("%s.wav", time.Now().Format(timeformat))
-	}
+    outputfilename = getOutputFilename(outputfilename)
 
-	// create turns from conversation string
+	// Split the conversation into turns.
 	turns := strings.Split(conversation, "\n")
 
-	// create SSML from conversation
+	// Get the voice configurations.
 	voices := getSpeechVoicesForName([]string{voice1name, voice2name})
 	ctx := context.Background()
 
 	outputfiles := []string{}
 
+	// Regex to identify voice 1 turns.
 	v1re := regexp.MustCompile(`^\|\s\[\*\]`)
+	// Regex to identify voice 2 turns.
 	v2re := regexp.MustCompile(`^\|\s\[\+\]`)
 
 	if turnbyturn {
@@ -318,25 +333,23 @@ func synthesizeWithVoice(ctx context.Context, voice ttspb.VoiceSelectionParams, 
 
 // synthesize takes a block of SSML and generates audio bytes using GCP TTS
 func synthesize(ctx context.Context, ssml string) ([]byte, error) {
-	// note use of us-central1 endpoint for Neural2 voices
-	client, err := texttospeech.NewClient(
-		ctx,
-		//option.WithEndpoint("texttospeech.googleapis.com:443"),
-	)
+	// Create a text-to-speech client.
+	client, err := newTextToSpeechClient(ctx)
 	if err != nil {
-		return []byte{}, err
+		return []byte{}, fmt.Errorf("failed to create TTS client: %w", err)
 	}
 	defer client.Close()
 
-	//var input ttspb.SynthesisInput
+	// Configure the synthesis input.
 	input := ttspb.SynthesisInput{
 		InputSource: &ttspb.SynthesisInput_Ssml{Ssml: string(ssml)},
 	}
-	//log.Printf("%s", string(ssml))
+    // Check if the input text exceeds the character limit
 	if len(string(ssml)) > 5000 {
-		return []byte{}, fmt.Errorf("too many characters: %d", len(string(ssml)))
+		return []byte{}, fmt.Errorf("input text exceeds the maximum allowed length of 5000 characters: %d", len(string(ssml)))
 	}
 
+    // Configure the synthesis request.
 	req := ttspb.SynthesizeSpeechRequest{
 		Input: &input,
 		Voice: &ttspb.VoiceSelectionParams{
@@ -346,11 +359,10 @@ func synthesize(ctx context.Context, ssml string) ([]byte, error) {
 			AudioEncoding: ttspb.AudioEncoding_LINEAR16,
 		},
 	}
-	log.Printf("%v", req)
+	// Perform the text-to-speech synthesis.
 	resp, err := client.SynthesizeSpeech(ctx, &req)
 	if err != nil {
-		log.Printf("error in SynthesizeSpeech: %v", err)
-		return []byte{}, err
+		return []byte{}, fmt.Errorf("failed to synthesize speech: %w", err)
 	}
 	return resp.AudioContent, nil
 }
@@ -431,6 +443,16 @@ func listVoices() ([]*ttspb.Voice, error) {
 	}
 
 	return voicesResponse.Voices, nil
+}
+
+
+// newTextToSpeechClient creates a new text to speech client
+func newTextToSpeechClient(ctx context.Context) (*texttospeech.Client, error) {
+	client, err := texttospeech.NewClient(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("texttospeech.NewClient: %w", err)
+	}
+	return client, nil
 }
 
 // jsonify prints nicely
