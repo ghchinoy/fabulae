@@ -75,8 +75,8 @@ func init() {
 	flag.StringVar(&assetdir, "assetdir", ".", "output folder")
 
 	flag.StringVar(&configfile, "config", "", "path to JSON config file")
-	flag.StringVar(&voice1name, "voice1", "en-US-Journey-D", "voice 1")
-	flag.StringVar(&voice2name, "voice2", "en-US-Journey-F", "voice 2")
+	flag.StringVar(&voice1name, "voice1", "en-US-Chirp-HD-D", "voice 1")
+	flag.StringVar(&voice2name, "voice2", "en-US-Chirp-HD-F", "voice 2")
 	flag.StringVar(&striptags, "strip", "AGENT,CUSTOMER", "particpant labels to split")
 	flag.BoolVar(&turnbyturn, "turn-by-turn", true, "output each turn as a wav")
 	flag.Parse()

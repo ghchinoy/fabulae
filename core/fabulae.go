@@ -122,7 +122,6 @@ func Fabulae(voice1name, voice2name string, conversation string, outputfilename 
 
 	// create SSML from conversation
 	voices := getSpeechVoicesForName([]string{voice1name, voice2name})
-
 	ctx := context.Background()
 
 	outputfiles := []string{}
