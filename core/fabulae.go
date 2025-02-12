@@ -135,7 +135,6 @@ func Fabulae(voice1name, voice2name string, conversation string, outputfilename 
 
 	// Get the voice configurations.
 	voices := getSpeechVoicesForName([]string{voice1name, voice2name})
-
 	ctx := context.Background()
 
 	outputfiles := []string{}
