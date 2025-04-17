@@ -128,8 +128,8 @@ func handleSynthesis(w http.ResponseWriter, r *http.Request) {
 
 		// default voices if there are none
 		if fabulaeRequest.Voice1Name == "" {
-			fabulaeRequest.Voice1Name = "en-US-Journey-D"
-			fabulaeRequest.Voice2Name = "en-US-Journey-F"
+			fabulaeRequest.Voice1Name = "en-US-Chirp3-HD-Charon"
+			fabulaeRequest.Voice2Name = "en-US-Chirp3-HD-Leda"
 		}
 	}
 
