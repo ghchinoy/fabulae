@@ -67,13 +67,13 @@ func main() {
 	// Get Google Cloud Region from environment variable
 	location = envCheck("REGION", "us-central1") // default is us-central1
 
-	// get all journey voices
+	// get all Chirp 3 voices
 	var err error
-	voices, err = listJourneyVoices()
+	voices, err = ListChirp3Voices()
 	if err != nil {
-		log.Fatalf("cannot listJourneyVoices: %v", err)
+		log.Fatalf("cannot listChirp3Voices: %v", err)
 	}
-	log.Printf("%d Journey voices", len(voices))
+	log.Printf("%d Chirp 3 HD voices", len(voices))
 
 	// run as service, env var precedence
 	service = envCheck("SERVICE", service)
@@ -224,7 +224,7 @@ func handleGeminiSynthesis(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleSynthesis generates audio with all Journey voices
+// handleSynthesis generates audio with all Chirp 3 voices
 func handleSynthesis(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -354,8 +354,8 @@ func getAllLanguages() []string {
 	return languages
 }
 
-// listJourneyVoices returns all voices with "Journey" in the name
-func listJourneyVoices() ([]*texttospeechpb.Voice, error) {
+// listChirp3Voices returns all voices with "Chirp-HD" in the name
+func listChirp3Voices() ([]*texttospeechpb.Voice, error) {
 	voices := []*texttospeechpb.Voice{}
 	ctx := context.Background()
 
@@ -370,7 +370,7 @@ func listJourneyVoices() ([]*texttospeechpb.Voice, error) {
 	}
 
 	for _, voice := range resp.Voices {
-		if strings.Contains(voice.Name, "Journey") {
+		if strings.Contains(voice.Name, "Chirp-HD") {
 			voices = append(voices, voice)
 		}
 	}

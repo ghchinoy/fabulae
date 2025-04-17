@@ -18,7 +18,6 @@ import (
 	texttospeech "cloud.google.com/go/texttospeech/apiv1"
 	"cloud.google.com/go/texttospeech/apiv1/texttospeechpb"
 	"cloud.google.com/go/vertexai/genai"
-	"google.golang.org/api/option"
 
 	"github.com/schollz/progressbar/v3"
 )
@@ -55,7 +54,6 @@ func newStorageClient(ctx context.Context) (*storage.Client, error) {
 	return client, nil
 }
 
-
 const timeformat = "20060102.030405.06"
 
 func init() {
@@ -70,13 +68,13 @@ func init() {
 	// Get Google Cloud Region from environment variable
 	location = envCheck("REGION", "us-central1") // default is us-central1
 
-	// get all journey voices
+	// get all Chirp-HD voices
 	var err error
-	voices, err = ListJourneyVoices()
+	voices, err = ListChirp3Voices()
 	if err != nil {
-		log.Fatalf("cannot listJourneyVoices: %v", err)
+		log.Fatalf("cannot listChirp3Voices: %v", err)
 	}
-	log.Printf("%d Journey voices", len(voices))
+	log.Printf("%d Chirp 3 HD voices", len(voices))
 }
 
 func main() {
@@ -156,7 +154,7 @@ type VoiceMetadata struct {
 
 // HandleSynthesis receives the request and creates all voices
 func HandleSynthesis(w http.ResponseWriter, r *http.Request) {
-    // HandleSynthesis receives the request and creates all voices
+	// HandleSynthesis receives the request and creates all voices
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "unable to process body", http.StatusInternalServerError)
@@ -290,8 +288,8 @@ func getAllLanguages() []string {
 	return languages
 }
 
-// ListJourneyVoices returns all voices with "Journey" in the name
-func ListJourneyVoices() ([]*texttospeechpb.Voice, error) {
+// ListChirp3Voices returns all voices with "Journey" in the name
+func ListChirp3Voices() ([]*texttospeechpb.Voice, error) {
 	voices := []*texttospeechpb.Voice{}
 	ctx := context.Background()
 
@@ -306,7 +304,7 @@ func ListJourneyVoices() ([]*texttospeechpb.Voice, error) {
 	}
 
 	for _, voice := range resp.Voices {
-		if strings.Contains(voice.Name, "Journey") {
+		if strings.Contains(voice.Name, "Chirp-HD") {
 			voices = append(voices, voice)
 		}
 	}
